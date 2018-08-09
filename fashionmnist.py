@@ -21,16 +21,16 @@ y_test = dataset[5]
 from binary import fashiontraining
 tf.reset_default_graph()
 # binary = [0, 0, 0, 0, 0, 0, 0, 0, 0]
-binary = [1, 1, 1, 1, 1, 1, 0, 0, 0]
-fisher = [0, 0, 0, 0, 0, 0, 1, 1, 1]
+binary = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+fisher = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 fashiontraining(x_train, y_train, x_cv, y_cv, x_test, y_test,
          is_binary = binary,
          is_fisher = fisher,
          is_stochastic = False,
-         conv_featmap = [128, 128, 256, 256, 512, 512],
-         fc_units = [1024, 1024],
+         conv_featmap = [32, 64],
+         fc_units = [7 * 7 * 64, 1024],
          conv_kernel_size = [5, 5],
-         pooling_size = [2, 2, 2],
+         pooling_size = [2, 2],
          lr_start = 0.005,
          lr_end = 0.0003,
          epoch = 20,

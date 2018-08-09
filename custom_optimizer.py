@@ -112,8 +112,10 @@ def _adam_optimize_bn(loss, learning_rate, is_training, is_binary, gamma=0.0, co
 
             #Calculate m, and v from adam for the wts
             for grad, layer in zip(conv_layer_w_gradient_tot, conv_layer_list):
-                new_conv_m_wgrad.append( layer.m_w.assign(tf.squeeze(beta1 * layer.m_w + (1 - beta1) * grad)))
-                new_conv_v_wgrad.append( layer.v_w.assign(tf.squeeze(beta2 * layer.v_w + (1 - beta2) * grad ** 2)))
+                # new_conv_m_wgrad.append( layer.m_w.assign(tf.squeeze(beta1 * layer.m_w + (1 - beta1) * grad)))
+                new_conv_m_wgrad.append( layer.m_w.assign(beta1 * layer.m_w + (1 - beta1) * grad))
+                # new_conv_v_wgrad.append( layer.v_w.assign(tf.squeeze(beta2 * layer.v_w + (1 - beta2) * grad ** 2)))
+                new_conv_v_wgrad.append( layer.v_w.assign(beta2 * layer.v_w + (1 - beta2) * grad ** 2))
 
             #Calculate m, and v from adam for the biases
             for grad, layer in zip(conv_layer_bias_grads, conv_layer_list):

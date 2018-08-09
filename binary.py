@@ -544,197 +544,84 @@ def FashionNetwork(input_x, input_y, is_training, is_drop_out, is_binary, is_sto
 
     # here is the architecture of the network
     # 128Conv3-BN-128Conv3-MaxPool2-BN-256Conv3-BN-256Conv3-MaxPool2-BN-512Conv3-BN-512Conv3-MaxPool2-BN-1024fc-1024fc-10fc
-    x_image = tf.reshape(x, [-1, 28, 28, 1])
+    x_image = tf.reshape(input_x, [-1, 28, 28, 1])
 
     conv_layer_0 = conv_layer(input_x=x_image,
                               in_channel=channel_num,
                               out_channel=conv_featmap[0],
                               kernel_shape=conv_kernel_size[0],
-                              padding='VALID',
+                              padding='SAME',
                               binary=is_binary[0],
                               stochastic=is_stochastic,
                               is_training=is_training,
                               fisher=is_fisher_regularized[0],
                               index=0)
+    pooling_layer_0 = max_pooling_layer(input_x=conv_layer_0.output(),
+                                        pool_size=pooling_size[0],
+                                        padding="SAME")
 
-    norm_layer_0 = norm_layer(input_x=conv_layer_0.output(),
-                              is_training=is_training,
-                              is_drop_out=False,
-                              activation_function=tf.nn.relu,
-                              index=0)
 
-    conv_layer_1 = conv_layer(input_x=norm_layer_0.output(),
+    conv_layer_1 = conv_layer(input_x=pooling_layer_0.output(),
                               in_channel=conv_featmap[0],
                               out_channel=conv_featmap[1],
                               kernel_shape=conv_kernel_size[1],
-                              padding='VALID',
+                              padding='SAME',
                               binary=is_binary[1],
                               stochastic=is_stochastic,
                               is_training=is_training,
                               fisher=is_fisher_regularized[1],
                               index=1)
 
-    pooling_layer_0 = max_pooling_layer(input_x=conv_layer_1.output(),
-                                        pool_size=pooling_size[0],
-                                        padding="SAME")
-
-    norm_layer_1 = norm_layer(input_x=pooling_layer_0.output(),
-                              is_training=is_training,
-                              is_drop_out=False,
-                              activation_function=tf.nn.relu,
-                              index=1)
-
-    conv_layer_2 = conv_layer(input_x=norm_layer_1.output(),
-                              in_channel=conv_featmap[1],
-                              out_channel=conv_featmap[2],
-                              kernel_shape=conv_kernel_size[2],
-                              padding='VALID',
-                              binary=is_binary[2],
-                              stochastic=is_stochastic,
-                              is_training=is_training,
-                              fisher=is_fisher_regularized[2],
-                              index=2)
-
-    norm_layer_2 = norm_layer(input_x=conv_layer_2.output(),
-                              is_training=is_training,
-                              is_drop_out=False,
-                              activation_function=tf.nn.relu,
-                              index=2)
-
-    conv_layer_3 = conv_layer(input_x=norm_layer_2.output(),
-                              in_channel=conv_featmap[2],
-                              out_channel=conv_featmap[3],
-                              kernel_shape=conv_kernel_size[3],
-                              padding='VALID',
-                              binary=is_binary[3],
-                              stochastic=is_stochastic,
-                              is_training=is_training,
-                              fisher=is_fisher_regularized[3],
-                              index=3)
-
-    pooling_layer_1 = max_pooling_layer(input_x=conv_layer_3.output(),
+    pooling_layer_1 = max_pooling_layer(input_x=conv_layer_1.output(),
                                         pool_size=pooling_size[1],
                                         padding="SAME")
 
-    norm_layer_3 = norm_layer(input_x=pooling_layer_1.output(),
-                              is_training=is_training,
-                              is_drop_out=False,
-                              activation_function=tf.nn.relu,
-                              index=3)
-
-    conv_layer_4 = conv_layer(input_x=norm_layer_3.output(),
-                              in_channel=conv_featmap[3],
-                              out_channel=conv_featmap[4],
-                              kernel_shape=conv_kernel_size[4],
-                              padding='VALID',
-                              binary=is_binary[4],
-                              stochastic=is_stochastic,
-                              is_training=is_training,
-                              fisher=is_fisher_regularized[4],
-                              index=4)
-
-    norm_layer_4 = norm_layer(input_x=conv_layer_4.output(),
-                              is_training=is_training,
-                              is_drop_out=False,
-                              activation_function=tf.nn.relu,
-                              index=4)
-
-    conv_layer_5 = conv_layer(input_x=norm_layer_4.output(),
-                              in_channel=conv_featmap[4],
-                              out_channel=conv_featmap[5],
-                              kernel_shape=conv_kernel_size[5],
-                              padding='VALID',
-                              binary=is_binary[5],
-                              stochastic=is_stochastic,
-                              is_training=is_training,
-                              fisher=is_fisher_regularized[5],
-                              index=5)
-
-    pooling_layer_2 = max_pooling_layer(input_x=conv_layer_5.output(),
-                                        pool_size=pooling_size[2],
-                                        padding="SAME")
-
-    norm_layer_5 = norm_layer(input_x=pooling_layer_2.output(),
-                              is_training=is_training,
-                              is_drop_out=False,
-                              activation_function=tf.nn.relu,
-                              index=5)
 
     # flatten the output of convolution layer
-    pool_shape = norm_layer_5.output().get_shape()
-    img_vector_length = pool_shape[1].value * pool_shape[2].value * pool_shape[3].value
-    flatten = tf.reshape(norm_layer_5.output(), shape=[-1, img_vector_length])
-
+    # pool_shape = pooling_layer_1.output().get_shape()
+    # img_vector_length = pool_shape[1].value * pool_shape[2].value * pool_shape[3].value
+    # print(fc_units[0])
+    flatten = tf.reshape(pooling_layer_1.output(), [-1,fc_units[0]])
     fc_layer_0 = fc_layer(input_x=flatten,
-                          in_size=img_vector_length,
-                          out_size=fc_units[0],
+                          in_size=fc_units[0],
+                          out_size=fc_units[1],
                           binary=is_binary[6],
                           stochastic=is_stochastic,
                           is_training=is_training,
                           fisher=is_fisher_regularized[6],
                           index=0)
-
-    norm_layer_6 = norm_layer(input_x=fc_layer_0.output(),
+    norm_layer_8 = norm_layer(input_x=fc_layer_0.output(),
                               is_training=is_training,
                               is_drop_out=is_drop_out,
                               activation_function=tf.nn.relu,
-                              index=6)
-
-    fc_layer_1 = fc_layer(input_x=norm_layer_6.output(),
-                          in_size=fc_units[0],
-                          out_size=fc_units[1],
+                              index=8)
+    fc_layer_1 = fc_layer(input_x=norm_layer_8.output(),
+                          in_size=fc_units[1],
+                          out_size=output_size,
                           binary=is_binary[7],
                           stochastic=is_stochastic,
                           is_training=is_training,
                           fisher=is_fisher_regularized[7],
                           index=1)
 
-    norm_layer_7 = norm_layer(input_x=fc_layer_1.output(),
-                              is_training=is_training,
-                              is_drop_out=is_drop_out,
-                              activation_function=tf.nn.relu,
-                              index=7)
 
-    fc_layer_2 = fc_layer(input_x=norm_layer_7.output(),
-                          in_size=fc_units[1],
-                          out_size=output_size,
-                          binary=is_binary[8],
-                          stochastic=is_stochastic,
-                          is_training=is_training,
-                          fisher=is_fisher_regularized[8],
-                          index=2)
-
-    norm_layer_8 = norm_layer(input_x=fc_layer_2.output(),
-                              is_training=is_training,
-                              is_drop_out=False,
-                              activation_function=None,
-                              index=8)
 
     # compute loss
     with tf.name_scope("loss"):
-        net_output = norm_layer_8.output()
+        net_output =     fc_layer_1.output()
         label = tf.one_hot(input_y, output_size)
         # the hinge square loss
         loss = tf.reduce_mean(tf.square(tf.losses.hinge_loss(label, net_output)))
         tf.summary.scalar('loss', loss)
 
-    conv_layer_list = [conv_layer_0, conv_layer_1, conv_layer_2, conv_layer_3, conv_layer_4, conv_layer_5]
-    fc_layer_list = [fc_layer_0, fc_layer_1, fc_layer_2]
+    conv_layer_list = [conv_layer_0, conv_layer_1]
+    fc_layer_list = [fc_layer_0, fc_layer_1]
 
     _updates = _adam_optimize_bn(loss, learning_rate, is_training, is_binary, conv_layer_list=conv_layer_list,
                                  fc_layer_list=fc_layer_list, gamma=gamma)
 
 
     return net_output, loss, _updates
-
-
-# evaluate the output
-def evaluate(output, input_y):
-    with tf.name_scope('evaluate'):
-        pred = tf.argmax(output, axis=1)
-        error_num = tf.count_nonzero(pred - input_y, name='error_num')
-        tf.summary.scalar('error_num', error_num)
-    return error_num
 
 
 def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fisher, is_stochastic, conv_featmap, fc_units, conv_kernel_size, pooling_size, lr_start, lr_end, epoch, batch_size, is_drop_out, verbose=False, pre_trained_model=None, record_tensorboard=False, fisher_epochs = 0):
@@ -898,8 +785,10 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
 
     # define the variables and parameter needed during training
     with tf.name_scope('inputs'):
-        x = tf.placeholder(tf.float32, shape=(None, 784), name='inputs')
-        y_ = tf.placeholder(tf.float32, shape=(None ), name='labels')
+        # x = tf.placeholder(tf.float32, shape=(None, 784), name='inputs')
+        # y_ = tf.placeholder(tf.float32, shape=(None ), name='labels')
+        xs = tf.placeholder(shape=[None, 784], dtype=tf.float32)
+        ys = tf.placeholder(shape=[None, ], dtype=tf.int64)
         gamma = tf.placeholder(shape=[], dtype=tf.float32)
         is_training = tf.placeholder(dtype=tf.bool, name='is_training')
 
@@ -915,7 +804,7 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
                                     is_drop_out=is_drop_out,
                                     is_binary=is_binary,
                                     is_stochastic=is_stochastic,
-                                    channel_num=3,
+                                    channel_num=1,
                                     output_size=10,
                                     conv_featmap=conv_featmap,
                                     fc_units=fc_units,
@@ -985,8 +874,9 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
 
                 valid_eve_sum = 0
                 for i in range(y_val.shape[0] // val_batch_size):
-                    val_batch_x = X_val[i * val_batch_size:(i + 1) * val_batch_size]
+                    val_batch_x = np.array(X_val[i * val_batch_size:(i + 1) * val_batch_size]).reshape(100,784)
                     val_batch_y = y_val[i * val_batch_size:(i + 1) * val_batch_size]
+
                     valid_eve = sess.run([eve], feed_dict={xs: val_batch_x, ys: val_batch_y, is_training: False})
 
                     valid_eve_sum += np.sum(valid_eve)
