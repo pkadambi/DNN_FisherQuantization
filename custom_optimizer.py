@@ -66,11 +66,13 @@ def _adam_optimize_bn(loss, learning_rate, is_training, is_binary, gamma=0.0, co
                 if fclayer.fisher and fclayer.binary:
                     fc_wgrad_fisher_gradient.append(gamma *
                         fclayer.fisherconst * 2.0 * gradients_impl._hessian_vector_product(loss, [fclayer.wb],
-                                                                                             [fclayer.perturbation]))
+                                                                                             [fclayer.perturbation]) + gamma *
+                        fclayer.fisherconst * 2.0 * fclayer.perturbation)
                 elif fclayer.fisher:
                     fc_wgrad_fisher_gradient.append(gamma *
-                        fclayer.fisherconst * 2.0 * gradients_impl._hessian_vector_product(loss, [fclayer.weight],
-                                                                                             [fclayer.perturbation]))
+                        fclayer.fisherconst * 0.05 * gradients_impl._hessian_vector_product(loss, [fclayer.weight],
+                                                                                             [fclayer.perturbation]) + gamma *
+                        fclayer.fisherconst * 0.05 * fclayer.perturbation)
                 else:
                     fc_wgrad_fisher_gradient.append(0.)
 
@@ -93,15 +95,15 @@ def _adam_optimize_bn(loss, learning_rate, is_training, is_binary, gamma=0.0, co
             for conv_w_grad, conv_w_fisher_grad in zip(conv_layer_wgrad_grads, conv_wgrad_fisher_gradient):
                 conv_layer_w_gradient_tot.append(conv_w_grad + conv_w_fisher_grad)
                 if record_tensorboard:
-                    tf.summary.histogram('grads_layer'+str(i), conv_w_grad)
-                    tf.summary.histogram('fishergrad_layer'+str(i), conv_w_fisher_grad)
+                    tf.summary.histogram('conv_grads_layer'+str(i), conv_w_grad)
+                    tf.summary.histogram('conv_fishergrad_layer'+str(i), conv_w_fisher_grad)
                 i+=1
 
             for fc_w_grad, fc_w_fisher_grad in zip(fc_layer_wgrad_grads, fc_wgrad_fisher_gradient):
                 fc_layer_w_gradient_tot.append(fc_w_grad + fc_w_fisher_grad)
                 if record_tensorboard:
-                    tf.summary.histogram('grads_layer' + str(i), fc_w_grad)
-                    tf.summary.histogram('layer'+str(i), fc_w_fisher_grad)
+                    tf.summary.histogram('fc_grads_layer' + str(i), fc_w_grad)
+                    tf.summary.histogram('fc_fishergrad_layer'+str(i), fc_w_fisher_grad)
                 i+=1
 
             # FOR CONV LAYERS:

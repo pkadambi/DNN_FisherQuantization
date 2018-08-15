@@ -1,4 +1,4 @@
-
+from tensorflow.python.ops import gradients_impl
 import tensorflow as tf
 import numpy as np
 import time
@@ -77,10 +77,8 @@ class conv_layer(object):
             # otherwise, return binarization directly
             # else:
 
-            wb = binarization(weight, H=1, binary=binary, stochastic=stochastic)
-
             self.weight = weight
-            self.wb = wb
+            self.wb = binarization(weight, H=1, binary=True, stochastic=stochastic)
 
             if binary:
                 self.cell_out = tf.nn.conv2d(input_x, self.wb, strides=[1, 1, 1, 1], padding=padding)
@@ -95,20 +93,22 @@ class conv_layer(object):
             #     cell_out = tf.nn.conv2d(input_x, self.weight, strides=[1, 1, 1, 1], padding=padding)
 
 
-            self.perturbation = tf.stop_gradient(weight - wb)
+            self.perturbation = self.weight - self.wb
 
             # if fisher:
             #     self.pertubation = tf.stop_gradient(weight - wb)
             self.fisher = fisher
             self.fisherconst = fisherconst
             self.binary = binary
+            self.index=index
 
             self.cell_out = tf.add(self.cell_out, bias)
 
 
-
             tf.summary.histogram('conv_layer/{}/kernel'.format(index), self.weight)
+            tf.summary.histogram('fc_layer/{}/binarized_kernel'.format(index), self.weight)
             tf.summary.histogram('conv_layer/{}/bias'.format(index), self.bias)
+            tf.summary.histogram('conv_layer/{}/perturbation'.format(index), self.perturbation)
 
             if optimizer == 'Adam':
                 # to store the moments for adam
@@ -158,8 +158,7 @@ class fc_layer(object):
                                        initializer=tf.constant_initializer(0.))
                 self.bias = bias
 
-            wb = binarization(weight, H=1, binary=binary, stochastic=stochastic)
-            self.wb = wb
+            self.wb = binarization(weight, H=1, binary=True, stochastic=stochastic)
             self.weight = weight
             #If we are regularizing the layer,
             # if binary or fisher:
@@ -180,17 +179,19 @@ class fc_layer(object):
             elif fisher:
                 self.cell_out = tf.cond(is_training,  lambda: tf.add(tf.matmul(input_x, self.weight), bias),
                                         lambda: tf.add(tf.matmul(input_x, self.wb), bias))
+                print(self.weight)
             else:
                 self.cell_out = tf.add(tf.matmul(input_x, self.weight), bias)
 
-
-            self.perturbation = tf.stop_gradient(weight - wb)
+            self.perturbation = self.weight - self.wb
             self.fisher = fisher
             self.fisherconst = fisherconst
             self.binary = binary
-
+            self.index=index
             tf.summary.histogram('fc_layer/{}/kernel'.format(index), self.weight)
+            tf.summary.histogram('fc_layer/{}/binarized_kernel'.format(index), self.weight)
             tf.summary.histogram('fc_layer/{}/bias'.format(index), self.bias)
+            tf.summary.histogram('fc_layer/{}/perturbation'.format(index), self.perturbation)
 
             # to store the moments for adam
             if optimizer == 'Adam':
@@ -214,7 +215,8 @@ def l2_svm_loss(labels, net_output):
 
 
 def tf_softmax_crossentropy_with_logits(labels, logits):
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=logits))
+    print('Using Crossent Loss')
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=logits))
 
     return loss
 
