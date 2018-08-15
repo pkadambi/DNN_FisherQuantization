@@ -1,6 +1,6 @@
 # DNN_FisherQuantization
 **Description:**
-This is a framework for implementing a Fisher information based regularizer for ensuring that a neural network's weights are robust to quantization. Also this framework contains an implementation of BinaryConnect so that we can  
+This is a framework for implementing a Fisher information based regularizer for ensuring that a neural network's weights are robust to quantization. Also, this framework contains an implementation of BinaryConnect to compare against as a baseline.
 
 **Contains:**
 
