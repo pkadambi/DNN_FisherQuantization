@@ -4,11 +4,11 @@ import numpy as np
 import time
 from custom_optimizer import _adam_optimize_bn
 
-from nn_framework import hard_sigmoid, binarization, data_generator, conv_layer, norm_layer, fc_layer, max_pooling_layer
+from nn_framework import hard_sigmoid, binarization, data_generator, conv_layer, norm_layer, fc_layer, max_pooling_layer, l2_svm_loss, tf_softmax_crossentropy_with_logits
 
 
-def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic, channel_num, output_size,
-            conv_featmap, fc_units, conv_kernel_size, pooling_size, learning_rate, is_fisher_regularized, gamma):
+def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic, binarize_during_test, channel_num, output_size,
+            conv_featmap, fc_units, conv_kernel_size, pooling_size, learning_rate, is_fisher_regularized, gamma, loss_type, record_tensorboard):
     # is_training: whether train the network or validate it
     # is_drop_out: whether to dropout during training
     # is_binary: whether use the Binary Connect or not
@@ -29,6 +29,7 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
                               out_channel=conv_featmap[0],
                               kernel_shape=conv_kernel_size[0],
                               padding='VALID',
+                              binarize_during_test=binarize_during_test[0],
                               binary=is_binary[0],
                               stochastic=is_stochastic,
                               is_training=is_training,
@@ -46,6 +47,7 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
                               out_channel=conv_featmap[1],
                               kernel_shape=conv_kernel_size[1],
                               padding='VALID',
+                              binarize_during_test=binarize_during_test[1],
                               binary=is_binary[1],
                               stochastic=is_stochastic,
                               is_training=is_training,
@@ -67,6 +69,7 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
                               out_channel=conv_featmap[2],
                               kernel_shape=conv_kernel_size[2],
                               padding='VALID',
+                              binarize_during_test=binarize_during_test[2],
                               binary=is_binary[2],
                               stochastic=is_stochastic,
                               is_training=is_training,
@@ -84,6 +87,7 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
                               out_channel=conv_featmap[3],
                               kernel_shape=conv_kernel_size[3],
                               padding='VALID',
+                              binarize_during_test=binarize_during_test[4],
                               binary=is_binary[3],
                               stochastic=is_stochastic,
                               is_training=is_training,
@@ -105,6 +109,7 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
                               out_channel=conv_featmap[4],
                               kernel_shape=conv_kernel_size[4],
                               padding='VALID',
+                              binarize_during_test=binarize_during_test[5],
                               binary=is_binary[4],
                               stochastic=is_stochastic,
                               is_training=is_training,
@@ -122,6 +127,7 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
                               out_channel=conv_featmap[5],
                               kernel_shape=conv_kernel_size[5],
                               padding='VALID',
+                              binarize_during_test=binarize_during_test[6],
                               binary=is_binary[5],
                               stochastic=is_stochastic,
                               is_training=is_training,
@@ -147,6 +153,7 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
                           in_size=img_vector_length,
                           out_size=fc_units[0],
                           binary=is_binary[6],
+                          binarize_during_test=binarize_during_test[7],
                           stochastic=is_stochastic,
                           is_training=is_training,
                           fisher=is_fisher_regularized[6],
@@ -162,6 +169,7 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
                           in_size=fc_units[0],
                           out_size=fc_units[1],
                           binary=is_binary[7],
+                          binarize_during_test=binarize_during_test[8],
                           stochastic=is_stochastic,
                           is_training=is_training,
                           fisher=is_fisher_regularized[7],
@@ -192,329 +200,24 @@ def Network(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic
     with tf.name_scope("loss"):
         net_output = norm_layer_8.output()
         label = tf.one_hot(input_y, output_size)
-        # the hinge square loss
-        loss = tf.reduce_mean(tf.square(tf.losses.hinge_loss(label, net_output)))
-        tf.summary.scalar('loss', loss)
 
-    # def adam_optimize_bn():
-    #     with tf.name_scope("Adam_optimize"):
-    #         beta1 = 0.9
-    #         beta2 = 0.999
-    #         epsilon = 1e-08
-    #
-    #         # time step
-    #         t = tf.get_variable(name='timestep', shape=[], initializer=tf.constant_initializer(0))
-    #
-    #         # function that return all the updates
-    #         def true_fn(loss=loss, conv_layer_0=conv_layer_0, conv_layer_1=conv_layer_1, conv_layer_2=conv_layer_2,
-    #                     conv_layer_3=conv_layer_3, conv_layer_4=conv_layer_4, conv_layer_5=conv_layer_5,
-    #                     fc_layer_0=fc_layer_0,
-    #                     fc_layer_2=fc_layer_2, t=t):
-    #
-    #             new_t = t.assign(t + 1)
-    #
-    #             # calculate gradients
-    #             grad_conv_wb0, grad_conv_wb1, grad_conv_wb2, grad_conv_wb3, grad_conv_wb4, grad_conv_wb5 \
-    #                 = tf.gradients(ys=loss, xs=[conv_layer_0.wb, conv_layer_1.wb, conv_layer_2.wb, conv_layer_3.wb,
-    #                                             conv_layer_4.wb, conv_layer_5.wb])
-    #             grad_fc_wb0, grad_fc_wb1, grad_fc_wb2 \
-    #                 = tf.gradients(ys=loss, xs=[fc_layer_0.wb, fc_layer_1.wb, fc_layer_2.wb])
-    #
-    #             grad_conv_b0, grad_conv_b1, grad_conv_b2, grad_conv_b3, grad_conv_b4, grad_conv_b5 \
-    #                 = tf.gradients(ys=loss,
-    #                                xs=[conv_layer_0.bias, conv_layer_1.bias, conv_layer_2.bias, conv_layer_3.bias,
-    #                                    conv_layer_4.bias, conv_layer_5.bias])
-    #             grad_fc_b0, grad_fc_b1, grad_fc_b2 \
-    #                 = tf.gradients(ys=loss, xs=[fc_layer_0.bias, fc_layer_1.bias, fc_layer_2.bias])
-    #
-    #             # calculate updates for conv_layer_0
-    #             new_conv_m_wb0 = conv_layer_0.m_w.assign(beta1 * conv_layer_0.m_w + (1. - beta1) * grad_conv_wb0)
-    #             new_conv_v_wb0 = conv_layer_0.v_w.assign(beta2 * conv_layer_0.v_w + (1. - beta2) * grad_conv_wb0 ** 2)
-    #             new_conv_m_b0 = conv_layer_0.m_b.assign(beta1 * conv_layer_0.m_b + (1. - beta1) * grad_conv_b0)
-    #             new_conv_v_b0 = conv_layer_0.v_b.assign(beta2 * conv_layer_0.v_b + (1. - beta2) * grad_conv_b0 ** 2)
-    #             update_conv_wb0 = new_conv_m_wb0 / (tf.sqrt(new_conv_v_wb0) + epsilon)
-    #             update_conv_b0 = new_conv_m_b0 / (tf.sqrt(new_conv_v_b0) + epsilon)
-    #
-    #             # calculate updates for conv_layer_1
-    #             new_conv_m_wb1 = conv_layer_1.m_w.assign(beta1 * conv_layer_1.m_w + (1. - beta1) * grad_conv_wb1)
-    #             new_conv_v_wb1 = conv_layer_1.v_w.assign(beta2 * conv_layer_1.v_w + (1. - beta2) * grad_conv_wb1 ** 2)
-    #             new_conv_m_b1 = conv_layer_1.m_b.assign(beta1 * conv_layer_1.m_b + (1. - beta1) * grad_conv_b1)
-    #             new_conv_v_b1 = conv_layer_1.v_b.assign(beta2 * conv_layer_1.v_b + (1. - beta2) * grad_conv_b1 ** 2)
-    #             update_conv_wb1 = new_conv_m_wb1 / (tf.sqrt(new_conv_v_wb1) + epsilon)
-    #             update_conv_b1 = new_conv_m_b1 / (tf.sqrt(new_conv_v_b1) + epsilon)
-    #
-    #             # calculate updates for conv_layer_2
-    #             new_conv_m_wb2 = conv_layer_2.m_w.assign(beta1 * conv_layer_2.m_w + (1. - beta1) * grad_conv_wb2)
-    #             new_conv_v_wb2 = conv_layer_2.v_w.assign(beta2 * conv_layer_2.v_w + (1. - beta2) * grad_conv_wb2 ** 2)
-    #             new_conv_m_b2 = conv_layer_2.m_b.assign(beta1 * conv_layer_2.m_b + (1. - beta1) * grad_conv_b2)
-    #             new_conv_v_b2 = conv_layer_2.v_b.assign(beta2 * conv_layer_2.v_b + (1. - beta2) * grad_conv_b2 ** 2)
-    #             update_conv_wb2 = new_conv_m_wb2 / (tf.sqrt(new_conv_v_wb2) + epsilon)
-    #             update_conv_b2 = new_conv_m_b2 / (tf.sqrt(new_conv_v_b2) + epsilon)
-    #
-    #             # calculate updates for conv_layer_3
-    #             new_conv_m_wb3 = conv_layer_3.m_w.assign(beta1 * conv_layer_3.m_w + (1. - beta1) * grad_conv_wb3)
-    #             new_conv_v_wb3 = conv_layer_3.v_w.assign(beta2 * conv_layer_3.v_w + (1. - beta2) * grad_conv_wb3 ** 2)
-    #             new_conv_m_b3 = conv_layer_3.m_b.assign(beta1 * conv_layer_3.m_b + (1. - beta1) * grad_conv_b3)
-    #             new_conv_v_b3 = conv_layer_3.v_b.assign(beta2 * conv_layer_3.v_b + (1. - beta2) * grad_conv_b3 ** 2)
-    #             update_conv_wb3 = new_conv_m_wb3 / (tf.sqrt(new_conv_v_wb3) + epsilon)
-    #             update_conv_b3 = new_conv_m_b3 / (tf.sqrt(new_conv_v_b3) + epsilon)
-    #
-    #             # calculate updates for conv_layer_4
-    #             new_conv_m_wb4 = conv_layer_4.m_w.assign(beta1 * conv_layer_4.m_w + (1. - beta1) * grad_conv_wb4)
-    #             new_conv_v_wb4 = conv_layer_4.v_w.assign(beta2 * conv_layer_4.v_w + (1. - beta2) * grad_conv_wb4 ** 2)
-    #             new_conv_m_b4 = conv_layer_4.m_b.assign(beta1 * conv_layer_4.m_b + (1. - beta1) * grad_conv_b4)
-    #             new_conv_v_b4 = conv_layer_4.v_b.assign(beta2 * conv_layer_4.v_b + (1. - beta2) * grad_conv_b4 ** 2)
-    #             update_conv_wb4 = new_conv_m_wb4 / (tf.sqrt(new_conv_v_wb4) + epsilon)
-    #             update_conv_b4 = new_conv_m_b4 / (tf.sqrt(new_conv_v_b4) + epsilon)
-    #
-    #             # calculate updates for conv_layer_5
-    #             new_conv_m_wb5 = conv_layer_5.m_w.assign(beta1 * conv_layer_5.m_w + (1. - beta1) * grad_conv_wb5)
-    #             new_conv_v_wb5 = conv_layer_5.v_w.assign(beta2 * conv_layer_5.v_w + (1. - beta2) * grad_conv_wb5 ** 2)
-    #             new_conv_m_b5 = conv_layer_5.m_b.assign(beta1 * conv_layer_5.m_b + (1. - beta1) * grad_conv_b5)
-    #             new_conv_v_b5 = conv_layer_5.v_b.assign(beta2 * conv_layer_5.v_b + (1. - beta2) * grad_conv_b5 ** 2)
-    #             update_conv_wb5 = new_conv_m_wb5 / (tf.sqrt(new_conv_v_wb5) + epsilon)
-    #             update_conv_b5 = new_conv_m_b5 / (tf.sqrt(new_conv_v_b5) + epsilon)
-    #
-    #             # calculate updates for fc_layer_0
-    #             new_fc_m_wb0 = fc_layer_0.m_w.assign(beta1 * fc_layer_0.m_w + (1. - beta1) * grad_fc_wb0)
-    #             new_fc_v_wb0 = fc_layer_0.v_w.assign(beta2 * fc_layer_0.v_w + (1. - beta2) * grad_fc_wb0 ** 2)
-    #             new_fc_m_b0 = fc_layer_0.m_b.assign(beta1 * fc_layer_0.m_b + (1. - beta1) * grad_fc_b0)
-    #             new_fc_v_b0 = fc_layer_0.v_b.assign(beta2 * fc_layer_0.v_b + (1. - beta2) * grad_fc_b0 ** 2)
-    #             update_fc_wb0 = new_fc_m_wb0 / (tf.sqrt(new_fc_v_wb0) + epsilon)
-    #             update_fc_b0 = new_fc_m_b0 / (tf.sqrt(new_fc_v_b0) + epsilon)
-    #
-    #             # calculate updates for fc_layer_1
-    #             new_fc_m_wb1 = fc_layer_1.m_w.assign(beta1 * fc_layer_1.m_w + (1. - beta1) * grad_fc_wb1)
-    #             new_fc_v_wb1 = fc_layer_1.v_w.assign(beta2 * fc_layer_1.v_w + (1. - beta2) * grad_fc_wb1 ** 2)
-    #             new_fc_m_b1 = fc_layer_1.m_b.assign(beta1 * fc_layer_1.m_b + (1. - beta1) * grad_fc_b1)
-    #             new_fc_v_b1 = fc_layer_1.v_b.assign(beta2 * fc_layer_1.v_b + (1. - beta2) * grad_fc_b1 ** 2)
-    #             update_fc_wb1 = new_fc_m_wb1 / (tf.sqrt(new_fc_v_wb1) + epsilon)
-    #             update_fc_b1 = new_fc_m_b1 / (tf.sqrt(new_fc_v_b1) + epsilon)
-    #
-    #             # calculate updates for fc_layer_2
-    #             new_fc_m_wb2 = fc_layer_2.m_w.assign(beta1 * fc_layer_2.m_w + (1. - beta1) * grad_fc_wb2)
-    #             new_fc_v_wb2 = fc_layer_2.v_w.assign(beta2 * fc_layer_2.v_w + (1. - beta2) * grad_fc_wb2 ** 2)
-    #             new_fc_m_b2 = fc_layer_2.m_b.assign(beta1 * fc_layer_2.m_b + (1. - beta1) * grad_fc_b2)
-    #             new_fc_v_b2 = fc_layer_2.v_b.assign(beta2 * fc_layer_2.v_b + (1. - beta2) * grad_fc_b2 ** 2)
-    #             update_fc_wb2 = new_fc_m_wb2 / (tf.sqrt(new_fc_v_wb2) + epsilon)
-    #             update_fc_b2 = new_fc_m_b2 / (tf.sqrt(new_fc_v_b2) + epsilon)
-    #
-    #             return (update_conv_wb0, update_conv_wb1, update_conv_wb2, update_conv_wb3, update_conv_wb4,
-    #                     update_conv_wb5,
-    #                     update_fc_wb0, update_fc_wb1, update_fc_wb2, update_conv_b0, update_conv_b1, update_conv_b2,
-    #                     update_conv_b3, update_conv_b4, update_conv_b5, update_fc_b0, update_fc_b1, update_fc_b2), new_t
-    #
-    #         # update = 0 in validation/test phase.
-    #         def false_fn(t=t):
-    #             return (0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.), t
-    #
-    #         # if is_training, do update
-    #         adam_update, new_t = tf.cond(is_training, true_fn, false_fn)
-    #
-    #         # adjust learning rate with beta
-    #         lr = learning_rate * tf.sqrt(1 - beta2 ** new_t) / (1 - beta1 ** new_t)
-    #         tf.summary.scalar('learning_rate', lr)
-    #
-    #         # if is_binary, clip the weights to [-1, +1] before assignment
-    #         if is_binary:
-    #             new_conv_w0 = conv_layer_0.weight.assign(
-    #                 tf.contrib.keras.backend.clip(conv_layer_0.weight - lr * adam_update[0], -1.0, 1.0))
-    #             new_conv_w1 = conv_layer_1.weight.assign(
-    #                 tf.contrib.keras.backend.clip(conv_layer_1.weight - lr * adam_update[1], -1.0, 1.0))
-    #             new_conv_w2 = conv_layer_2.weight.assign(
-    #                 tf.contrib.keras.backend.clip(conv_layer_2.weight - lr * adam_update[2], -1.0, 1.0))
-    #             new_conv_w3 = conv_layer_3.weight.assign(
-    #                 tf.contrib.keras.backend.clip(conv_layer_3.weight - lr * adam_update[3], -1.0, 1.0))
-    #             new_conv_w4 = conv_layer_4.weight.assign(
-    #                 tf.contrib.keras.backend.clip(conv_layer_4.weight - lr * adam_update[4], -1.0, 1.0))
-    #             new_conv_w5 = conv_layer_5.weight.assign(
-    #                 tf.contrib.keras.backend.clip(conv_layer_5.weight - lr * adam_update[5], -1.0, 1.0))
-    #             new_fc_w0 = fc_layer_0.weight.assign(
-    #                 tf.contrib.keras.backend.clip(fc_layer_0.weight - lr * adam_update[6], -1.0, 1.0))
-    #             new_fc_w1 = fc_layer_1.weight.assign(
-    #                 tf.contrib.keras.backend.clip(fc_layer_1.weight - lr * adam_update[7], -1.0, 1.0))
-    #             new_fc_w2 = fc_layer_2.weight.assign(
-    #                 tf.contrib.keras.backend.clip(fc_layer_2.weight - lr * adam_update[8], -1.0, 1.0))
-    #         else:
-    #             new_conv_w0 = conv_layer_0.weight.assign(conv_layer_0.weight - lr * adam_update[0])
-    #             new_conv_w1 = conv_layer_1.weight.assign(conv_layer_1.weight - lr * adam_update[1])
-    #             new_conv_w2 = conv_layer_2.weight.assign(conv_layer_2.weight - lr * adam_update[2])
-    #             new_conv_w3 = conv_layer_3.weight.assign(conv_layer_3.weight - lr * adam_update[3])
-    #             new_conv_w4 = conv_layer_4.weight.assign(conv_layer_4.weight - lr * adam_update[4])
-    #             new_conv_w5 = conv_layer_5.weight.assign(conv_layer_5.weight - lr * adam_update[5])
-    #             new_fc_w0 = fc_layer_0.weight.assign(fc_layer_0.weight - lr * adam_update[6])
-    #             new_fc_w1 = fc_layer_1.weight.assign(fc_layer_1.weight - lr * adam_update[7])
-    #             new_fc_w2 = fc_layer_2.weight.assign(fc_layer_2.weight - lr * adam_update[8])
-    #
-    #         new_conv_b0 = conv_layer_0.bias.assign(conv_layer_0.bias - lr * adam_update[9])
-    #         new_conv_b1 = conv_layer_1.bias.assign(conv_layer_1.bias - lr * adam_update[10])
-    #         new_conv_b2 = conv_layer_2.bias.assign(conv_layer_2.bias - lr * adam_update[11])
-    #         new_conv_b3 = conv_layer_3.bias.assign(conv_layer_3.bias - lr * adam_update[12])
-    #         new_conv_b4 = conv_layer_4.bias.assign(conv_layer_4.bias - lr * adam_update[13])
-    #         new_conv_b5 = conv_layer_5.bias.assign(conv_layer_5.bias - lr * adam_update[14])
-    #         new_fc_b0 = fc_layer_0.bias.assign(fc_layer_0.bias - lr * adam_update[15])
-    #         new_fc_b1 = fc_layer_1.bias.assign(fc_layer_1.bias - lr * adam_update[16])
-    #         new_fc_b2 = fc_layer_2.bias.assign(fc_layer_2.bias - lr * adam_update[17])
-    #
-    #     return net_output, loss, (new_conv_w0, new_conv_w1, new_conv_w2, new_conv_w3, new_conv_w4, new_conv_w5, new_fc_w0,
-    #     new_fc_w1, new_fc_w2, new_conv_b0, new_conv_b1, new_conv_b2, new_conv_b3, new_conv_b4,
-    #     new_conv_b5, new_fc_b0, new_fc_b1, new_fc_b2)
+        if loss_type == 'l2svm':
+            # the hinge square loss
+            loss = l2_svm_loss(labels=label, net_output=net_output)
+        else:
+            loss = tf_softmax_crossentropy_with_logits(labels = label, logits = net_output)
+
+        tf.summary.histogram('Output', net_output)
+        tf.summary.scalar('loss', loss)
 
     # net_output, loss, _updates = adam_optimize_bn()
     conv_layer_list = [conv_layer_0, conv_layer_1, conv_layer_2, conv_layer_3, conv_layer_4, conv_layer_5]
     fc_layer_list = [fc_layer_0, fc_layer_1, fc_layer_2]
 
-    _updates = _adam_optimize_bn(loss, learning_rate, is_training, is_binary, conv_layer_list = conv_layer_list, fc_layer_list = fc_layer_list, gamma=gamma)
+    _updates = _adam_optimize_bn(loss, learning_rate, is_training, is_binary, conv_layer_list = conv_layer_list, fc_layer_list = fc_layer_list, gamma=gamma, record_tensorboard=record_tensorboard)
 
     # update parameters with adam
 
-    # with tf.name_scope("Adam_optimize"):
-    #     beta1 = 0.9
-    #     beta2 = 0.999
-    #     epsilon = 1e-08
-    #
-    #     # time step
-    #     t = tf.get_variable(name='timestep', shape=[], initializer=tf.constant_initializer(0))
-    #
-    #     # function that return all the updates
-    #     def true_fn(loss=loss, conv_layer_0=conv_layer_0, conv_layer_1=conv_layer_1, conv_layer_2=conv_layer_2,
-    #                 conv_layer_3=conv_layer_3, conv_layer_4=conv_layer_4, conv_layer_5=conv_layer_5, fc_layer_0=fc_layer_0,
-    #                 fc_layer_2=fc_layer_2, t=t):
-    #
-    #         new_t = t.assign(t + 1)
-    #
-    #         # calculate gradients
-    #         grad_conv_wb0, grad_conv_wb1, grad_conv_wb2, grad_conv_wb3, grad_conv_wb4, grad_conv_wb5 \
-    #             = tf.gradients(ys=loss, xs=[conv_layer_0.wb, conv_layer_1.wb, conv_layer_2.wb, conv_layer_3.wb,
-    #                                         conv_layer_4.wb, conv_layer_5.wb])
-    #         grad_fc_wb0, grad_fc_wb1, grad_fc_wb2 \
-    #             = tf.gradients(ys=loss, xs=[fc_layer_0.wb, fc_layer_1.wb, fc_layer_2.wb])
-    #
-    #         grad_conv_b0, grad_conv_b1, grad_conv_b2, grad_conv_b3, grad_conv_b4, grad_conv_b5 \
-    #             = tf.gradients(ys=loss, xs=[conv_layer_0.bias, conv_layer_1.bias, conv_layer_2.bias, conv_layer_3.bias,
-    #                                         conv_layer_4.bias, conv_layer_5.bias])
-    #         grad_fc_b0, grad_fc_b1, grad_fc_b2 \
-    #             = tf.gradients(ys=loss, xs=[fc_layer_0.bias, fc_layer_1.bias, fc_layer_2.bias])
-    #
-    #         # calculate updates for conv_layer_0
-    #         new_conv_m_wb0 = conv_layer_0.m_w.assign(beta1 * conv_layer_0.m_w + (1. - beta1) * grad_conv_wb0)
-    #         new_conv_v_wb0 = conv_layer_0.v_w.assign(beta2 * conv_layer_0.v_w + (1. - beta2) * grad_conv_wb0 ** 2)
-    #         new_conv_m_b0 = conv_layer_0.m_b.assign(beta1 * conv_layer_0.m_b + (1. - beta1) * grad_conv_b0)
-    #         new_conv_v_b0 = conv_layer_0.v_b.assign(beta2 * conv_layer_0.v_b + (1. - beta2) * grad_conv_b0 ** 2)
-    #         update_conv_wb0 = new_conv_m_wb0 / (tf.sqrt(new_conv_v_wb0) + epsilon)
-    #         update_conv_b0 = new_conv_m_b0 / (tf.sqrt(new_conv_v_b0) + epsilon)
-    #
-    #         # calculate updates for conv_layer_1
-    #         new_conv_m_wb1 = conv_layer_1.m_w.assign(beta1 * conv_layer_1.m_w + (1. - beta1) * grad_conv_wb1)
-    #         new_conv_v_wb1 = conv_layer_1.v_w.assign(beta2 * conv_layer_1.v_w + (1. - beta2) * grad_conv_wb1 ** 2)
-    #         new_conv_m_b1 = conv_layer_1.m_b.assign(beta1 * conv_layer_1.m_b + (1. - beta1) * grad_conv_b1)
-    #         new_conv_v_b1 = conv_layer_1.v_b.assign(beta2 * conv_layer_1.v_b + (1. - beta2) * grad_conv_b1 ** 2)
-    #         update_conv_wb1 = new_conv_m_wb1 / (tf.sqrt(new_conv_v_wb1) + epsilon)
-    #         update_conv_b1 = new_conv_m_b1 / (tf.sqrt(new_conv_v_b1) + epsilon)
-    #
-    #         # calculate updates for conv_layer_2
-    #         new_conv_m_wb2 = conv_layer_2.m_w.assign(beta1 * conv_layer_2.m_w + (1. - beta1) * grad_conv_wb2)
-    #         new_conv_v_wb2 = conv_layer_2.v_w.assign(beta2 * conv_layer_2.v_w + (1. - beta2) * grad_conv_wb2 ** 2)
-    #         new_conv_m_b2 = conv_layer_2.m_b.assign(beta1 * conv_layer_2.m_b + (1. - beta1) * grad_conv_b2)
-    #         new_conv_v_b2 = conv_layer_2.v_b.assign(beta2 * conv_layer_2.v_b + (1. - beta2) * grad_conv_b2 ** 2)
-    #         update_conv_wb2 = new_conv_m_wb2 / (tf.sqrt(new_conv_v_wb2) + epsilon)
-    #         update_conv_b2 = new_conv_m_b2 / (tf.sqrt(new_conv_v_b2) + epsilon)
-    #
-    #         # calculate updates for conv_layer_3
-    #         new_conv_m_wb3 = conv_layer_3.m_w.assign(beta1 * conv_layer_3.m_w + (1. - beta1) * grad_conv_wb3)
-    #         new_conv_v_wb3 = conv_layer_3.v_w.assign(beta2 * conv_layer_3.v_w + (1. - beta2) * grad_conv_wb3 ** 2)
-    #         new_conv_m_b3 = conv_layer_3.m_b.assign(beta1 * conv_layer_3.m_b + (1. - beta1) * grad_conv_b3)
-    #         new_conv_v_b3 = conv_layer_3.v_b.assign(beta2 * conv_layer_3.v_b + (1. - beta2) * grad_conv_b3 ** 2)
-    #         update_conv_wb3 = new_conv_m_wb3 / (tf.sqrt(new_conv_v_wb3) + epsilon)
-    #         update_conv_b3 = new_conv_m_b3 / (tf.sqrt(new_conv_v_b3) + epsilon)
-    #
-    #         # calculate updates for conv_layer_4
-    #         new_conv_m_wb4 = conv_layer_4.m_w.assign(beta1 * conv_layer_4.m_w + (1. - beta1) * grad_conv_wb4)
-    #         new_conv_v_wb4 = conv_layer_4.v_w.assign(beta2 * conv_layer_4.v_w + (1. - beta2) * grad_conv_wb4 ** 2)
-    #         new_conv_m_b4 = conv_layer_4.m_b.assign(beta1 * conv_layer_4.m_b + (1. - beta1) * grad_conv_b4)
-    #         new_conv_v_b4 = conv_layer_4.v_b.assign(beta2 * conv_layer_4.v_b + (1. - beta2) * grad_conv_b4 ** 2)
-    #         update_conv_wb4 = new_conv_m_wb4 / (tf.sqrt(new_conv_v_wb4) + epsilon)
-    #         update_conv_b4 = new_conv_m_b4 / (tf.sqrt(new_conv_v_b4) + epsilon)
-    #
-    #         # calculate updates for conv_layer_5
-    #         new_conv_m_wb5 = conv_layer_5.m_w.assign(beta1 * conv_layer_5.m_w + (1. - beta1) * grad_conv_wb5)
-    #         new_conv_v_wb5 = conv_layer_5.v_w.assign(beta2 * conv_layer_5.v_w + (1. - beta2) * grad_conv_wb5 ** 2)
-    #         new_conv_m_b5 = conv_layer_5.m_b.assign(beta1 * conv_layer_5.m_b + (1. - beta1) * grad_conv_b5)
-    #         new_conv_v_b5 = conv_layer_5.v_b.assign(beta2 * conv_layer_5.v_b + (1. - beta2) * grad_conv_b5 ** 2)
-    #         update_conv_wb5 = new_conv_m_wb5 / (tf.sqrt(new_conv_v_wb5) + epsilon)
-    #         update_conv_b5 = new_conv_m_b5 / (tf.sqrt(new_conv_v_b5) + epsilon)
-    #
-    #         # calculate updates for fc_layer_0
-    #         new_fc_m_wb0 = fc_layer_0.m_w.assign(beta1 * fc_layer_0.m_w + (1. - beta1) * grad_fc_wb0)
-    #         new_fc_v_wb0 = fc_layer_0.v_w.assign(beta2 * fc_layer_0.v_w + (1. - beta2) * grad_fc_wb0 ** 2)
-    #         new_fc_m_b0 = fc_layer_0.m_b.assign(beta1 * fc_layer_0.m_b + (1. - beta1) * grad_fc_b0)
-    #         new_fc_v_b0 = fc_layer_0.v_b.assign(beta2 * fc_layer_0.v_b + (1. - beta2) * grad_fc_b0 ** 2)
-    #         update_fc_wb0 = new_fc_m_wb0 / (tf.sqrt(new_fc_v_wb0) + epsilon)
-    #         update_fc_b0 = new_fc_m_b0 / (tf.sqrt(new_fc_v_b0) + epsilon)
-    #
-    #         # calculate updates for fc_layer_1
-    #         new_fc_m_wb1 = fc_layer_1.m_w.assign(beta1 * fc_layer_1.m_w + (1. - beta1) * grad_fc_wb1)
-    #         new_fc_v_wb1 = fc_layer_1.v_w.assign(beta2 * fc_layer_1.v_w + (1. - beta2) * grad_fc_wb1 ** 2)
-    #         new_fc_m_b1 = fc_layer_1.m_b.assign(beta1 * fc_layer_1.m_b + (1. - beta1) * grad_fc_b1)
-    #         new_fc_v_b1 = fc_layer_1.v_b.assign(beta2 * fc_layer_1.v_b + (1. - beta2) * grad_fc_b1 ** 2)
-    #         update_fc_wb1 = new_fc_m_wb1 / (tf.sqrt(new_fc_v_wb1) + epsilon)
-    #         update_fc_b1 = new_fc_m_b1 / (tf.sqrt(new_fc_v_b1) + epsilon)
-    #
-    #         # calculate updates for fc_layer_2
-    #         new_fc_m_wb2 = fc_layer_2.m_w.assign(beta1 * fc_layer_2.m_w + (1. - beta1) * grad_fc_wb2)
-    #         new_fc_v_wb2 = fc_layer_2.v_w.assign(beta2 * fc_layer_2.v_w + (1. - beta2) * grad_fc_wb2 ** 2)
-    #         new_fc_m_b2 = fc_layer_2.m_b.assign(beta1 * fc_layer_2.m_b + (1. - beta1) * grad_fc_b2)
-    #         new_fc_v_b2 = fc_layer_2.v_b.assign(beta2 * fc_layer_2.v_b + (1. - beta2) * grad_fc_b2 ** 2)
-    #         update_fc_wb2 = new_fc_m_wb2 / (tf.sqrt(new_fc_v_wb2) + epsilon)
-    #         update_fc_b2 = new_fc_m_b2 / (tf.sqrt(new_fc_v_b2) + epsilon)
-    #
-    #         return (update_conv_wb0, update_conv_wb1, update_conv_wb2, update_conv_wb3, update_conv_wb4, update_conv_wb5,
-    #                 update_fc_wb0, update_fc_wb1, update_fc_wb2, update_conv_b0, update_conv_b1, update_conv_b2,
-    #                 update_conv_b3, update_conv_b4, update_conv_b5, update_fc_b0, update_fc_b1, update_fc_b2), new_t
-    #
-    #     # update = 0 in validation/test phase.
-    #     def false_fn(t=t):
-    #         return (0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.), t
-    #
-    #     # if is_training, do update
-    #     adam_update, new_t = tf.cond(is_training, true_fn, false_fn)
-    #
-    #     # adjust learning rate with beta
-    #     lr = learning_rate * tf.sqrt(1 - beta2 ** new_t) / (1 - beta1 ** new_t)
-    #     tf.summary.scalar('learning_rate',lr)
-    #
-    #     # if is_binary, clip the weights to [-1, +1] before assignment
-    #     if is_binary:
-    #         new_conv_w0 = conv_layer_0.weight.assign(tf.contrib.keras.backend.clip(conv_layer_0.weight - lr * adam_update[0], -1.0, 1.0))
-    #         new_conv_w1 = conv_layer_1.weight.assign(tf.contrib.keras.backend.clip(conv_layer_1.weight - lr * adam_update[1], -1.0, 1.0))
-    #         new_conv_w2 = conv_layer_2.weight.assign(tf.contrib.keras.backend.clip(conv_layer_2.weight - lr * adam_update[2], -1.0, 1.0))
-    #         new_conv_w3 = conv_layer_3.weight.assign(tf.contrib.keras.backend.clip(conv_layer_3.weight - lr * adam_update[3], -1.0, 1.0))
-    #         new_conv_w4 = conv_layer_4.weight.assign(tf.contrib.keras.backend.clip(conv_layer_4.weight - lr * adam_update[4], -1.0, 1.0))
-    #         new_conv_w5 = conv_layer_5.weight.assign(tf.contrib.keras.backend.clip(conv_layer_5.weight - lr * adam_update[5], -1.0, 1.0))
-    #         new_fc_w0 = fc_layer_0.weight.assign(tf.contrib.keras.backend.clip(fc_layer_0.weight - lr * adam_update[6], -1.0, 1.0))
-    #         new_fc_w1 = fc_layer_1.weight.assign(tf.contrib.keras.backend.clip(fc_layer_1.weight - lr * adam_update[7], -1.0, 1.0))
-    #         new_fc_w2 = fc_layer_2.weight.assign(tf.contrib.keras.backend.clip(fc_layer_2.weight - lr * adam_update[8], -1.0, 1.0))
-    #     else:
-    #         new_conv_w0 = conv_layer_0.weight.assign(conv_layer_0.weight - lr * adam_update[0])
-    #         new_conv_w1 = conv_layer_1.weight.assign(conv_layer_1.weight - lr * adam_update[1])
-    #         new_conv_w2 = conv_layer_2.weight.assign(conv_layer_2.weight - lr * adam_update[2])
-    #         new_conv_w3 = conv_layer_3.weight.assign(conv_layer_3.weight - lr * adam_update[3])
-    #         new_conv_w4 = conv_layer_4.weight.assign(conv_layer_4.weight - lr * adam_update[4])
-    #         new_conv_w5 = conv_layer_5.weight.assign(conv_layer_5.weight - lr * adam_update[5])
-    #         new_fc_w0 = fc_layer_0.weight.assign(fc_layer_0.weight - lr * adam_update[6])
-    #         new_fc_w1 = fc_layer_1.weight.assign(fc_layer_1.weight - lr * adam_update[7])
-    #         new_fc_w2 = fc_layer_2.weight.assign(fc_layer_2.weight - lr * adam_update[8])
-    #
-    #     new_conv_b0 = conv_layer_0.bias.assign(conv_layer_0.bias - lr * adam_update[9])
-    #     new_conv_b1 = conv_layer_1.bias.assign(conv_layer_1.bias - lr * adam_update[10])
-    #     new_conv_b2 = conv_layer_2.bias.assign(conv_layer_2.bias - lr * adam_update[11])
-    #     new_conv_b3 = conv_layer_3.bias.assign(conv_layer_3.bias - lr * adam_update[12])
-    #     new_conv_b4 = conv_layer_4.bias.assign(conv_layer_4.bias - lr * adam_update[13])
-    #     new_conv_b5 = conv_layer_5.bias.assign(conv_layer_5.bias - lr * adam_update[14])
-    #     new_fc_b0 = fc_layer_0.bias.assign(fc_layer_0.bias - lr * adam_update[15])
-    #     new_fc_b1 = fc_layer_1.bias.assign(fc_layer_1.bias - lr * adam_update[16])
-    #     new_fc_b2 = fc_layer_2.bias.assign(fc_layer_2.bias - lr * adam_update[17])
-    #
     return net_output, loss, _updates
 
 
@@ -528,8 +231,8 @@ def evaluate(output, input_y):
     return error_num
 
 
-def FashionNetwork(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic, channel_num, output_size,
-            conv_featmap, fc_units, conv_kernel_size, pooling_size, learning_rate, is_fisher_regularized, gamma):
+def FashionNetwork(input_x, input_y, is_training, is_drop_out, is_binary, is_stochastic, binarize_during_test, channel_num, output_size,
+            conv_featmap, fc_units, conv_kernel_size, pooling_size, learning_rate, is_fisher_regularized, gamma, loss_type='l2svm', record_tensorboard=False):
     # is_training: whether train the network or validate it
     # is_drop_out: whether to dropout during training
     # is_binary: whether use the Binary Connect or not
@@ -551,6 +254,7 @@ def FashionNetwork(input_x, input_y, is_training, is_drop_out, is_binary, is_sto
                               out_channel=conv_featmap[0],
                               kernel_shape=conv_kernel_size[0],
                               padding='SAME',
+                              binarize_during_test = binarize_during_test[0],
                               binary=is_binary[0],
                               stochastic=is_stochastic,
                               is_training=is_training,
@@ -566,6 +270,7 @@ def FashionNetwork(input_x, input_y, is_training, is_drop_out, is_binary, is_sto
                               out_channel=conv_featmap[1],
                               kernel_shape=conv_kernel_size[1],
                               padding='SAME',
+                              binarize_during_test=binarize_during_test[1],
                               binary=is_binary[1],
                               stochastic=is_stochastic,
                               is_training=is_training,
@@ -585,10 +290,11 @@ def FashionNetwork(input_x, input_y, is_training, is_drop_out, is_binary, is_sto
     fc_layer_0 = fc_layer(input_x=flatten,
                           in_size=fc_units[0],
                           out_size=fc_units[1],
-                          binary=is_binary[6],
+                          binary=is_binary[2],
+                          binarize_during_test=binarize_during_test[2],
                           stochastic=is_stochastic,
                           is_training=is_training,
-                          fisher=is_fisher_regularized[6],
+                          fisher=is_fisher_regularized[2],
                           index=0)
     norm_layer_8 = norm_layer(input_x=fc_layer_0.output(),
                               is_training=is_training,
@@ -598,33 +304,44 @@ def FashionNetwork(input_x, input_y, is_training, is_drop_out, is_binary, is_sto
     fc_layer_1 = fc_layer(input_x=norm_layer_8.output(),
                           in_size=fc_units[1],
                           out_size=output_size,
-                          binary=is_binary[7],
+                          binary=is_binary[2],
+                          binarize_during_test=binarize_during_test[3],
                           stochastic=is_stochastic,
                           is_training=is_training,
-                          fisher=is_fisher_regularized[7],
+                          fisher=is_fisher_regularized[3],
                           index=1)
 
 
 
     # compute loss
     with tf.name_scope("loss"):
-        net_output =     fc_layer_1.output()
+        net_output = fc_layer_1.output()
         label = tf.one_hot(input_y, output_size)
         # the hinge square loss
-        loss = tf.reduce_mean(tf.square(tf.losses.hinge_loss(label, net_output)))
+
+        if loss_type == 'l2svm':
+            # the hinge square loss
+            loss = l2_svm_loss(labels=label, net_output=net_output)
+        else:
+            loss = tf_softmax_crossentropy_with_logits(labels = label, logits = net_output)
+
+
+        tf.summary.histogram('net_output', net_output)
         tf.summary.scalar('loss', loss)
 
     conv_layer_list = [conv_layer_0, conv_layer_1]
     fc_layer_list = [fc_layer_0, fc_layer_1]
 
     _updates = _adam_optimize_bn(loss, learning_rate, is_training, is_binary, conv_layer_list=conv_layer_list,
-                                 fc_layer_list=fc_layer_list, gamma=gamma)
+                                 fc_layer_list=fc_layer_list, gamma=gamma, record_tensorboard=record_tensorboard)
 
 
     return net_output, loss, _updates
 
 
-def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fisher, is_stochastic, conv_featmap, fc_units, conv_kernel_size, pooling_size, lr_start, lr_end, epoch, batch_size, is_drop_out, verbose=False, pre_trained_model=None, record_tensorboard=False, fisher_epochs = 0):
+def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fisher, binarize_during_test, is_stochastic,
+             conv_featmap, fc_units, conv_kernel_size, pooling_size, lr_start, lr_end, epoch, batch_size, is_drop_out,
+             verbose=False, pre_trained_model=None, record_tensorboard=False, fisher_epochs = 0, loss_type='l2svm'):
     # X_train, y_train, X_val, y_val, X_test, y_test:
     # is_binary: whether use the Binary Connect or not
     # is_stochastic: if use Binary Connect, whether to be stochastic
@@ -649,14 +366,15 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
     num_training = y_train.shape[0]
     num_val = y_val.shape[0]
     learning_rate = tf.Variable(lr_start, name="learning_rate", dtype=tf.float32)
-    # lr_decay = (lr_end / lr_start) ** (1 / epoch)
-    # lr_update = learning_rate.assign(tf.multiply(learning_rate, lr_decay))
+    lr_decay = (lr_end / lr_start) ** (1. / epoch)
+    lr_update = learning_rate.assign(tf.multiply(learning_rate, lr_decay))
 
     # build network
     output, loss, _update = Network(xs, ys, is_training,
                                      is_drop_out=is_drop_out,
                                      is_binary=is_binary,
                                      is_stochastic=is_stochastic,
+                                     binarize_during_test=binarize_during_test,
                                      channel_num=3,
                                      output_size=10,
                                      conv_featmap=conv_featmap,
@@ -665,7 +383,9 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
                                      pooling_size=pooling_size,
                                      learning_rate=learning_rate,
                                     is_fisher_regularized=is_fisher,
-                                    gamma=gamma)
+                                    gamma=gamma,
+                                    loss_type=loss_type,
+                                    record_tensorboard=record_tensorboard)
 
     iters = int(X_train.shape[0] / batch_size)
     print('number of batches for training: {}'.format(iters))
@@ -732,8 +452,8 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
 
                 valid_acc = 100 - valid_eve_sum * 100 / y_val.shape[0]
 
-                # _lr = sess.run([lr_update])
-                # print("updated learning rate: ", _lr)
+                _lr = sess.run([lr_update])
+                print("updated learning rate: ", _lr)
 
                 if verbose:
                     print('validation accuracy : {}%'.format(valid_acc))
@@ -767,9 +487,9 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
             pass
 
 
-def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fisher, is_stochastic, conv_featmap,
+def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fisher, binarize_during_test, is_stochastic, conv_featmap,
              fc_units, conv_kernel_size, pooling_size, lr_start, lr_end, epoch, batch_size, is_drop_out, verbose=False,
-             pre_trained_model=None, record_tensorboard=False, fisher_epochs=0):
+             pre_trained_model=None, fisher_epochs=0, loss_type='l2svm', record_tensorboard=False, logname=None):
     # X_train, y_train, X_val, y_val, X_test, y_test:
     # is_binary: whether use the Binary Connect or not
     # is_stochastic: if use Binary Connect, whether to be stochastic
@@ -796,14 +516,15 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
     num_training = y_train.shape[0]
     num_val = y_val.shape[0]
     learning_rate = tf.Variable(lr_start, name="learning_rate", dtype=tf.float32)
-    # lr_decay = (lr_end / lr_start) ** (1 / epoch)
-    # lr_update = learning_rate.assign(tf.multiply(learning_rate, lr_decay))
+    lr_decay = (lr_end / lr_start) ** (1 / epoch)
+    lr_update = learning_rate.assign(tf.multiply(learning_rate, lr_decay))
 
     # build network
     output, loss, _update = FashionNetwork(xs, ys, is_training,
                                     is_drop_out=is_drop_out,
                                     is_binary=is_binary,
                                     is_stochastic=is_stochastic,
+                                    binarize_during_test=binarize_during_test,
                                     channel_num=1,
                                     output_size=10,
                                     conv_featmap=conv_featmap,
@@ -812,7 +533,9 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
                                     pooling_size=pooling_size,
                                     learning_rate=learning_rate,
                                     is_fisher_regularized=is_fisher,
-                                    gamma=gamma)
+                                    gamma=gamma,
+                                    loss_type=loss_type,
+                                    record_tensorboard=record_tensorboard)
 
     iters = int(X_train.shape[0] / batch_size)
     print('number of batches for training: {}'.format(iters))
@@ -822,14 +545,18 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
     # batch size for validation, since validation set is too large
     val_batch_size = 100
     best_acc = 0
-    cur_model_name = 'cifar10_{}'.format(int(time.time()))
+
+    cur_model_name = 'fashionmnist_{}'.format(int(time.time()))
     total_time = 0
 
     with tf.Session() as sess:
 
         if record_tensorboard:
             merge = tf.summary.merge_all()
-            writer = tf.summary.FileWriter("log/{}".format(cur_model_name), sess.graph)
+            if logname==None:
+                writer = tf.summary.FileWriter("log/{}".format(cur_model_name), sess.graph)
+            else:
+                writer = tf.summary.FileWriter('log/'+logname, sess.graph)
 
         saver = tf.train.Saver()
         sess.run(tf.global_variables_initializer(), {is_training: False})
@@ -873,6 +600,7 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
                 print('average train loss: {} ,  average accuracy : {}%'.format(loss_sum, train_acc))
 
                 valid_eve_sum = 0
+
                 for i in range(y_val.shape[0] // val_batch_size):
                     val_batch_x = np.array(X_val[i * val_batch_size:(i + 1) * val_batch_size]).reshape(100,784)
                     val_batch_y = y_val[i * val_batch_size:(i + 1) * val_batch_size]
@@ -883,8 +611,8 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
 
                 valid_acc = 100 - valid_eve_sum * 100 / y_val.shape[0]
 
-                # _lr = sess.run([lr_update])
-                # print("updated learning rate: ", _lr)
+                _lr = sess.run([lr_update])
+                print("updated learning rate: ", _lr)
 
                 if verbose:
                     print('validation accuracy : {}%'.format(valid_acc))

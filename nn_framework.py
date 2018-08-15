@@ -54,7 +54,7 @@ class data_generator(object):
 
 
 class conv_layer(object):
-    def __init__(self, input_x, in_channel, out_channel, kernel_shape, padding="SAME", binary=False, stochastic=False,
+    def __init__(self, input_x, in_channel, out_channel, kernel_shape, padding="SAME", binarize_during_test=False, binary=False, stochastic=False,
                  is_training=None, index=0, fisher=False, fisherconst=.1, optimizer = 'Adam'):
         # binary: whether to implement the Binary Connect
         # stochastic: whether implement stochastic weight if do Binary Connect
@@ -87,7 +87,6 @@ class conv_layer(object):
             elif fisher:
                 self.cell_out = tf.cond(is_training,  lambda: tf.nn.conv2d(input_x, self.weight, strides=[1, 1, 1, 1], padding=padding),
                                         lambda: tf.nn.conv2d(input_x, self.wb, strides=[1, 1, 1, 1], padding=padding))
-                self.perturbation = tf.stop_gradient(weight - wb)
             else:
                 self.cell_out = tf.nn.conv2d(input_x, self.weight, strides=[1, 1, 1, 1], padding=padding)
             # if binary:
@@ -96,6 +95,7 @@ class conv_layer(object):
             #     cell_out = tf.nn.conv2d(input_x, self.weight, strides=[1, 1, 1, 1], padding=padding)
 
 
+            self.perturbation = tf.stop_gradient(weight - wb)
 
             # if fisher:
             #     self.pertubation = tf.stop_gradient(weight - wb)
@@ -140,7 +140,7 @@ class max_pooling_layer(object):
 
 
 class fc_layer(object):
-    def __init__(self, input_x, in_size, out_size, binary=False, stochastic=False, is_training=None, index=0,
+    def __init__(self, input_x, in_size, out_size, binary=False, binarize_during_test = False, stochastic=False, is_training=None, index=0,
                  fisherconst=.1, fisher = False, optimizer = 'Adam'):
         # binary: whether to implement the Binary Connect
         # stochastic: whether implement stochastic weight if do Binary Connect
@@ -180,11 +180,11 @@ class fc_layer(object):
             elif fisher:
                 self.cell_out = tf.cond(is_training,  lambda: tf.add(tf.matmul(input_x, self.weight), bias),
                                         lambda: tf.add(tf.matmul(input_x, self.wb), bias))
-                self.perturbation = tf.stop_gradient(weight - wb)
             else:
                 self.cell_out = tf.add(tf.matmul(input_x, self.weight), bias)
 
 
+            self.perturbation = tf.stop_gradient(weight - wb)
             self.fisher = fisher
             self.fisherconst = fisherconst
             self.binary = binary
@@ -206,6 +206,17 @@ class fc_layer(object):
 
     def output(self):
         return self.cell_out
+
+
+def l2_svm_loss(labels, net_output):
+    loss = tf.reduce_mean(tf.square(tf.losses.hinge_loss(labels, net_output)))
+    return loss
+
+
+def tf_softmax_crossentropy_with_logits(labels, logits):
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels, logits=logits))
+
+    return loss
 
 
 

@@ -12,7 +12,7 @@ the following pseudocode doesnt work
 import tensorflow as tf
 from tensorflow.python.ops import gradients_impl
 
-def _adam_optimize_bn(loss, learning_rate, is_training, is_binary, gamma=0.0, conv_layer_list=None, fc_layer_list=None, ):
+def _adam_optimize_bn(loss, learning_rate, is_training, is_binary, gamma=0.0, conv_layer_list=None, fc_layer_list=None, record_tensorboard=False):
     with tf.name_scope("Adam_optimize"):
         beta1 = 0.9
         beta2 = 0.999
@@ -89,13 +89,20 @@ def _adam_optimize_bn(loss, learning_rate, is_training, is_binary, gamma=0.0, co
             conv_layer_w_gradient_tot = []
             fc_layer_w_gradient_tot = []
 
+            i=0
             for conv_w_grad, conv_w_fisher_grad in zip(conv_layer_wgrad_grads, conv_wgrad_fisher_gradient):
                 conv_layer_w_gradient_tot.append(conv_w_grad + conv_w_fisher_grad)
+                if record_tensorboard:
+                    tf.summary.histogram('grads_layer'+str(i), conv_w_grad)
+                    tf.summary.histogram('fishergrad_layer'+str(i), conv_w_fisher_grad)
+                i+=1
 
             for fc_w_grad, fc_w_fisher_grad in zip(fc_layer_wgrad_grads, fc_wgrad_fisher_gradient):
-                # print(fc_w_grad)
-                # print(fc_w_fisher_grad)
                 fc_layer_w_gradient_tot.append(fc_w_grad + fc_w_fisher_grad)
+                if record_tensorboard:
+                    tf.summary.histogram('grads_layer' + str(i), fc_w_grad)
+                    tf.summary.histogram('layer'+str(i), fc_w_fisher_grad)
+                i+=1
 
             # FOR CONV LAYERS:
             new_conv_m_wgrad = []

@@ -51,14 +51,14 @@ def get_fashionMNIST(cross_validation_split = 0.5, convert_labels=True):
 
     x_train = x_train.reshape(n_train, x_dim*y_dim)
     x_test_validation = x_test_validation.reshape(n_test, x_dim*y_dim)
-    indx = int(n_test / 2 - 1)
+    indx = int(n_test / 2)
 
     if convert_labels:
         y_train = convert_label_to_one_hot(y_train, n_train, n_classes)
         y_test_validation = convert_label_to_one_hot(y_test_validation, n_test, n_classes)
 
-        y_cv = y_test_validation[0:(n_test / 2 - 1), :]
-        y_test = y_test_validation[(n_test/2):n_test,:]
+        y_cv = y_test_validation[0:indx, :]
+        y_test = y_test_validation[indx:,:]
         y_train = np.array(y_train).astype('float32')
         y_cv = np.array(y_cv).astype('float32')
         y_test = np.array(y_test).astype('float32')
@@ -66,21 +66,56 @@ def get_fashionMNIST(cross_validation_split = 0.5, convert_labels=True):
     else:
         # print(np.shape(y_test_validation))
         y_train = np.array(y_train).astype('int64')
-        y_test_validation = np.array(y_test_validation).astype('int64').reshape(n_test,1)
-        y_test_validation = y_test_validation.reshape(n_test,1)
+        y_test_validation = np.array(y_test_validation).astype('int64').reshape(n_test,)
+        y_test_validation = y_test_validation.reshape(n_test,)
         print(np.shape(y_test_validation))
         y_cv = y_test_validation[0:indx ]
         y_test = y_test_validation[indx :n_test]
+    print(indx)
+    print('\n')
+    print('Before Splitting')
 
+    print('X train shape')
+    print(np.shape(x_train))
 
-    x_cv = x_test_validation[indx,:]
+    print('X test shape')
+    print(np.shape(x_test_validation))
 
-    x_test = x_test_validation[indx, :]
+    print('Y test shape')
+    print(np.shape(y_test_validation))
+
+    print('Y train shape')
+    print(np.shape(y_train))
+
+    x_cv = x_test_validation[0:indx,:]
+
+    x_test = x_test_validation[indx: , :]
 
     x_train = np.array(x_train).astype('float32')
     x_cv = np.array(x_cv).astype('float32')
     x_test = np.array(x_test).astype('float32')
 
+    print('\n')
+
+    print('After Splitting:')
+    print('X test shape')
+    print(np.shape(x_test))
+
+    print('X cv shape')
+    print(np.shape(x_cv))
+
+    print('X train shape')
+    print(np.shape(x_train))
+
+    print('Y test shape')
+    print(np.shape(y_test))
+
+    print('Y cv shape')
+    print(np.shape(y_cv))
+
+    print('Y train shape')
+    print(np.shape(y_train))
+    print('\n')
 
 
     dataset = np.array([x_train, y_train, x_cv, y_cv, x_test, y_test])
