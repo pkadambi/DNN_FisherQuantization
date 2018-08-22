@@ -140,9 +140,11 @@ def get_acc_for_nonzero_gaussian_perturbed_logistic_model_MNIST(mu, sigma=.1, co
     diag_load_amt2 = gamma * .001 * perturbation2
 
     reg_grad1 = gamma * 2.0 * hvp1 + diag_load_amt1
+    # reg_grad1 =  diag_load_amt1
     reg_grad1 = tf.reshape(reg_grad1 , tf.shape(w))
 
     reg_grad2 = gamma * 2.0 * hvp2 + diag_load_amt2
+    # reg_grad2 = diag_load_amt2
     reg_grad2 = tf.reshape(reg_grad2 , tf.shape(w2))
 
     tot_grads1 = ce_grads_w1 + reg_grad1
@@ -163,12 +165,12 @@ def get_acc_for_nonzero_gaussian_perturbed_logistic_model_MNIST(mu, sigma=.1, co
     n_iters = 5000
     batch_size = 512
     n_fisher_iters=1000
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.15)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
 
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
-    summary_writer = tf.summary.FileWriter('./logs/linear_mdl', sess.graph)
-    summary_op = tf.summary.merge_all()
+    # summary_writer = tf.summary.FileWriter('./logs/linear_mdl', sess.graph)
+    # summary_op = tf.summary.merge_all()
 
     lossval=[]
     accval=[]
@@ -186,35 +188,47 @@ def get_acc_for_nonzero_gaussian_perturbed_logistic_model_MNIST(mu, sigma=.1, co
         else:
             regularizer_const=.1*const_multiplier
 
-        # _, l, acc, w_, b_ = sess.run([train_op, loss, accuracy, w, bias], feed_dict={x: x_batch, y: y_batch, gamma:regularizer_const})
-        summ, _, l, acc, w_ = sess.run([summary_op, train_op, loss, accuracy, w], feed_dict={x: x_batch, y: y_batch, gamma:regularizer_const, w_pert:w_pert_, w_pert2:w_pert2_})
+        _, l, acc, w_ = sess.run([train_op, loss, accuracy, w,], feed_dict={x: x_batch, y: y_batch, gamma:regularizer_const, w_pert:w_pert_, w_pert2:w_pert2_})
+        # summ, _, l, acc, w_ = sess.run([summary_op, train_op, loss, accuracy, w], feed_dict={x: x_batch, y: y_batch, gamma:regularizer_const, w_pert:w_pert_, w_pert2:w_pert2_})
 
-        summary_writer.add_summary(summ, i)
+        # summary_writer.add_summary(summ, i)
         lossval.append(l)
         accval.append(acc)
 
         if i == n_iters-n_fisher_iters:
+            print('USING WEIGHTS OPTIMAL OF TRAINING')
             w_, w2_ = sess.run([w, w2])
             w_pert_ = w_ + np.random.normal(mu, sigma, size = [784, 512])
             w_pert2_ = w2_ + np.random.normal(mu, sigma, size = [512, 10])
 
+        # if i == n_iters - 1:
+        #     print('USIGN WEIGHTS AT END OF REGULARIZED TRAINING')
+        #     w_, w2_ = sess.run([w, w2])
+        #     w_pert_ = w_ + np.random.normal(mu, sigma, size = [784, 512])
+        #     w_pert2_ = w2_ + np.random.normal(mu, sigma, size = [512, 10])
+
+
         if i%200==0:
             print('\nIteration: '+str(i)+'\nAccuracy: '+str(acc)+'\nLoss: '+str(l)+'\n')
+
+    regularizer_const = 0.
+
     # perturbed_test_set = mnist.test.images+np.random.normal(0.,stddev, np.shape(mnist.test.images))
     up_acc = sess.run(accuracy, feed_dict={x: mnist.test.images, y: mnist.test.labels})
     print('UNPERTURBED Test accuracy %g' % up_acc)
-    sess.run(tf.assign(w, w_pert))
+    sess.run(tf.assign(w, w_pert), feed_dict={x: mnist.test.images, y: mnist.test.labels, gamma:regularizer_const, w_pert:w_pert_, w_pert2:w_pert2_})
+    sess.run(tf.assign(w2, w_pert2_), feed_dict={x: mnist.test.images, y: mnist.test.labels, gamma:regularizer_const, w_pert:w_pert_, w_pert2:w_pert2_})
 
-    pert_acc = sess.run(accuracy, feed_dict={x: mnist.test.images, y: mnist.test.labels})
+    pert_acc = sess.run(accuracy, feed_dict={x: mnist.test.images, y: mnist.test.labels, gamma:regularizer_const, w_pert:w_pert_, w_pert2:w_pert2_})
     # pert_acc = sess.run(accuracy, feed_dict={x: perturbed_test_set, y: mnist.test.labels})
     print('PRETURBED test accuracy %g' % pert_acc)
-
+    # summary_writer.close()
     sess.close()
 
     return up_acc, pert_acc
 
 
-a, b = get_acc_for_nonzero_gaussian_perturbed_logistic_model_MNIST(.2, .1,)
+a, b = get_acc_for_nonzero_gaussian_perturbed_logistic_model_MNIST(.015, .005, const_multiplier=.33)
 
 
 
