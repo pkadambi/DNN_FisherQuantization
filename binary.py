@@ -361,7 +361,7 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
         ys = tf.placeholder(shape=[None, ], dtype=tf.int64)
         gamma = tf.placeholder(shape=[], dtype=tf.float32)
         is_training = tf.placeholder(dtype=tf.bool, name='is_training')
-    
+
     # update learning rate
     num_training = y_train.shape[0]
     num_val = y_val.shape[0]
@@ -389,8 +389,7 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
 
     iters = int(X_train.shape[0] / batch_size)
     print('number of batches for training: {}'.format(iters))
-
-    correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(ys, 1))
+    correct_prediction = tf.equal(tf.argmax(output, 1, output_type=tf.int32), tf.cast(ys, dtype=tf.int32))
     accuracy = tf.stop_gradient(tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy'))
 
     # batch size for validation, since validation set is too large
@@ -429,10 +428,14 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
                     start = time.time()
 
                     if record_tensorboard:
-                        summ, _, cur_loss, train_eve = sess.run([merge, _update, loss, correct_prediction ], feed_dict={xs: train_batch_x, ys: train_batch_y, is_training: True, gamma: fisher_gamma})
+                        summ, _, cur_loss, train_eve = sess.run([merge, _update, loss, correct_prediction ],
+                                                                feed_dict={xs: train_batch_x, ys: train_batch_y,
+                                                                           is_training: True, gamma: fisher_gamma})
                         writer.add_summary(summ, iter_counter)
                     else:
-                        _, cur_loss, train_eve = sess.run([_update, loss, correct_prediction ], feed_dict={xs: train_batch_x, ys: train_batch_y, is_training: True, gamma: fisher_gamma})
+                        _, cur_loss, train_eve = sess.run([_update, loss, correct_prediction ],
+                                                          feed_dict={xs: train_batch_x, ys: train_batch_y,
+                                                                     is_training: True, gamma: fisher_gamma})
 
                     total_time += time.time()-start
                     train_eve_sum += np.sum(train_eve)
@@ -447,7 +450,8 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
                 for i in range(y_val.shape[0]//val_batch_size):
                     val_batch_x = X_val[i*val_batch_size:(i+1)*val_batch_size]
                     val_batch_y = y_val[i*val_batch_size:(i+1)*val_batch_size]
-                    valid_eve = sess.run([correct_prediction ], feed_dict={xs: val_batch_x, ys: val_batch_y, is_training: False})
+                    valid_eve = sess.run([correct_prediction ],
+                                         feed_dict={xs: val_batch_x, ys: val_batch_y, is_training: False})
 
                     valid_eve_sum += np.sum(valid_eve)
 
@@ -476,7 +480,8 @@ def training(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, is_fishe
                 b = (i + 1) * 100 if (i + 1) * 100 < y_test.shape[0] else y_test.shape[0]
                 test_batch_x = X_test[a:b]
                 test_batch_y = y_test[a:b]
-                test_eve = sess.run([correct_prediction ], feed_dict={xs: test_batch_x, ys: test_batch_y, is_training: False})
+                test_eve = sess.run([correct_prediction ],
+                                    feed_dict={xs: test_batch_x, ys: test_batch_y, is_training: False})
 
                 test_eve_sum += np.sum(test_eve)
 
@@ -584,6 +589,7 @@ def fashiontraining(X_train, y_train, X_val, y_val, X_test, y_test, is_binary, i
                     np.random.shuffle(mask)
                     train_batch_x = X_train[mask]
                     train_batch_y = y_train[mask]
+
 
                     start = time.time()
 
