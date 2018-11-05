@@ -26,3 +26,4 @@ This is a framework for implementing a Fisher information based regularizer for 
 
 Parts of this project are based on the implementation of binary connect given on github by one of the authors, MatthieuCourbariaux (he shared a Theano/Torch implementation), and also from user yy2779, who created a tensorflow version of MatthieuCourbariaux's code.
 
+$\mathbf F$
